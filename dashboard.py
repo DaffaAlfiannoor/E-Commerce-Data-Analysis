@@ -49,6 +49,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 PALETTE = ['#264653','#2A9D8F','#E9C46A','#F4A261','#E76F51','#A8DADC','#457B9D','#6D6875']
+BAR_COLOR = '#2A9D8F'
+BAR_HIGHLIGHT = '#264653'
 
 # ── Data loading ──────────────────────────────────────────────────────────────
 @st.cache_data(show_spinner="Loading datasets...")
@@ -243,7 +245,7 @@ if page == "🏠 Overview":
     ), row=1, col=1)
     fig.add_trace(go.Bar(
         x=mr_filt['year_month_dt'], y=mr_filt['orders'],
-        marker_color=PALETTE[2], name='Orders',
+        marker_color=BAR_COLOR, name='Orders',
         hovertemplate='%{x|%b %Y}<br>%{y:,} orders<extra></extra>'
     ), row=2, col=1)
     fig.update_layout(height=500, showlegend=False, plot_bgcolor='#F8F9FA',
@@ -255,8 +257,8 @@ if page == "🏠 Overview":
         st.markdown('<div class="section-header">Top 10 States by Orders</div>', unsafe_allow_html=True)
         top_states = state_stats.nlargest(10, 'total_orders')
         fig2 = px.bar(top_states, x='customer_state', y='total_orders',
-                      color='total_orders', color_continuous_scale='teal',
                       labels={'customer_state':'State','total_orders':'Orders'})
+        fig2.update_traces(marker_color=BAR_COLOR)
         fig2.update_layout(showlegend=False, plot_bgcolor='#F8F9FA',
                            paper_bgcolor='white', height=350, margin=dict(t=10))
         st.plotly_chart(fig2, use_container_width=True)
@@ -264,7 +266,7 @@ if page == "🏠 Overview":
     with col2:
         st.markdown('<div class="section-header">Payment Type Distribution</div>', unsafe_allow_html=True)
         fig3 = px.pie(data['pay_type'], values='revenue', names='payment_type',
-                      color_discrete_sequence=PALETTE, hole=0.4)
+                      color_discrete_sequence=['#264653', '#2A9D8F', '#E9C46A', '#F4A261'], hole=0.4)
         fig3.update_layout(height=350, margin=dict(t=10))
         st.plotly_chart(fig3, use_container_width=True)
 
@@ -308,12 +310,12 @@ elif page == "📈 Revenue Trend":
         yoy = mr_filt2.pivot_table(index='month', columns='year', values='revenue', aggfunc='sum')
         months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
         fig4 = go.Figure()
-        for i, yr in enumerate(yoy.columns):
+        for yr in yoy.columns:
             fig4.add_trace(go.Bar(
                 x=[months[m-1] for m in yoy.index],
                 y=yoy[yr],
                 name=str(yr),
-                marker_color=PALETTE[i]
+                marker_color=BAR_HIGHLIGHT if yr == yoy.columns.max() else BAR_COLOR
             ))
         fig4.update_layout(barmode='group', height=380,
                            plot_bgcolor='#F8F9FA', paper_bgcolor='white',
@@ -357,10 +359,10 @@ elif page == "📦 Product Categories":
     with col1:
         fig = px.bar(top_cat.sort_values('total_revenue'),
                      x='total_revenue', y='category_en',
-                     orientation='h', color='total_revenue',
-                     color_continuous_scale='teal',
+                     orientation='h',
                      labels={'total_revenue':'Revenue (R$)','category_en':'Category'},
                      title=f'Top {top_n} Categories by Revenue')
+        fig.update_traces(marker_color=BAR_COLOR)
         fig.update_layout(height=500, plot_bgcolor='#F8F9FA', paper_bgcolor='white',
                           showlegend=False, margin=dict(t=40))
         st.plotly_chart(fig, use_container_width=True)
@@ -368,10 +370,10 @@ elif page == "📦 Product Categories":
     with col2:
         fig2 = px.bar(top_cat.sort_values('units_sold'),
                       x='units_sold', y='category_en',
-                      orientation='h', color='units_sold',
-                      color_continuous_scale='oranges',
+                      orientation='h',
                       labels={'units_sold':'Units Sold','category_en':'Category'},
                       title=f'Top {top_n} Categories by Units Sold')
+        fig2.update_traces(marker_color=BAR_COLOR)
         fig2.update_layout(height=500, plot_bgcolor='#F8F9FA', paper_bgcolor='white',
                            showlegend=False, margin=dict(t=40))
         st.plotly_chart(fig2, use_container_width=True)
@@ -421,9 +423,9 @@ elif page == "🌍 Geographic Analysis":
         # Use bar chart fallback (choropleth needs geojson for Brazil states)
         top_st = state_stats.nlargest(15, 'total_orders')
         fig = px.bar(top_st, x='customer_state', y='total_orders',
-                     color='total_orders', color_continuous_scale='teal',
                      title='Top 15 States by Order Volume',
                      labels={'customer_state':'State','total_orders':'Orders'})
+        fig.update_traces(marker_color=BAR_COLOR)
         fig.update_layout(showlegend=False, height=400,
                           plot_bgcolor='#F8F9FA', paper_bgcolor='white')
         st.plotly_chart(fig, use_container_width=True)
@@ -431,9 +433,9 @@ elif page == "🌍 Geographic Analysis":
     with col2:
         top_rev_st = state_stats.nlargest(15, 'revenue')
         fig2 = px.bar(top_rev_st, x='customer_state', y='revenue',
-                      color='revenue', color_continuous_scale='oranges',
                       title='Top 15 States by Revenue',
                       labels={'customer_state':'State','revenue':'Revenue (R$)'})
+        fig2.update_traces(marker_color=BAR_COLOR)
         fig2.update_layout(showlegend=False, height=400,
                            plot_bgcolor='#F8F9FA', paper_bgcolor='white')
         st.plotly_chart(fig2, use_container_width=True)
@@ -477,6 +479,10 @@ elif page == "👥 RFM Segmentation":
              total_revenue=('monetary','sum'))
         .sort_values('total_revenue', ascending=False))
     seg_summary['pct_customers'] = seg_summary['count'] / seg_summary['count'].sum() * 100
+    pie_summary = seg_summary.nlargest(4, 'count').copy()
+    other_count = seg_summary.loc[~seg_summary.index.isin(pie_summary.index), 'count'].sum()
+    if other_count:
+        pie_summary = pd.concat([pie_summary, pd.DataFrame([{'Segment': 'Other', 'count': other_count}])], ignore_index=True)
 
     seg_colors = {
         'Champions':'#264653','Loyal Customers':'#2A9D8F','New Customers':'#E9C46A',
@@ -492,18 +498,18 @@ elif page == "👥 RFM Segmentation":
 
     col1, col2 = st.columns(2)
     with col1:
-        fig = px.pie(seg_summary, values='count', names='Segment',
-                     color='Segment', color_discrete_map=seg_colors,
-                     title='Customer Distribution by RFM Segment', hole=0.3)
+        fig = px.pie(pie_summary, values='count', names='Segment',
+                     color='Segment', color_discrete_map={**seg_colors, 'Other': '#6D6875'},
+                     title='Customer Distribution by RFM Segment (Top 4 + Other)', hole=0.3)
         fig.update_layout(height=400, paper_bgcolor='white')
         st.plotly_chart(fig, use_container_width=True)
 
     with col2:
         fig2 = px.bar(seg_summary.sort_values('total_revenue'),
                       x='total_revenue', y='Segment', orientation='h',
-                      color='Segment', color_discrete_map=seg_colors,
-                      title='Revenue Contribution by Segment',
-                      labels={'total_revenue':'Revenue (R$)'})
+                      labels={'total_revenue':'Revenue (R$)'},
+                      title='Revenue Contribution by Segment')
+        fig2.update_traces(marker_color=BAR_COLOR)
         fig2.update_layout(showlegend=False, height=400,
                            plot_bgcolor='#F8F9FA', paper_bgcolor='white')
         st.plotly_chart(fig2, use_container_width=True)
@@ -527,16 +533,16 @@ elif page == "👥 RFM Segmentation":
     col1, col2 = st.columns(2)
     with col1:
         fig4 = px.bar(tier_df, x='spending_tier', y='customers',
-                      color='spending_tier', color_discrete_sequence=PALETTE,
                       title='Customers per Spending Tier',
                       labels={'spending_tier':'Tier','customers':'Customers'})
+        fig4.update_traces(marker_color=BAR_COLOR)
         fig4.update_layout(showlegend=False, plot_bgcolor='#F8F9FA', paper_bgcolor='white', height=350)
         st.plotly_chart(fig4, use_container_width=True)
     with col2:
         fig5 = px.bar(tier_df, x='spending_tier', y='avg_monetary',
-                      color='spending_tier', color_discrete_sequence=PALETTE,
                       title='Average Spend per Tier',
                       labels={'spending_tier':'Tier','avg_monetary':'Avg Spend (R$)'})
+        fig5.update_traces(marker_color=BAR_COLOR)
         fig5.update_layout(showlegend=False, plot_bgcolor='#F8F9FA', paper_bgcolor='white', height=350)
         st.plotly_chart(fig5, use_container_width=True)
 
